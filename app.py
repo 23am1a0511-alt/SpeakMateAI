@@ -1,6 +1,5 @@
 import re
 import random
-import sqlite3
 import streamlit as st
 
 from database import (
@@ -8,7 +7,6 @@ from database import (
     get_connection,
     save_speaking_session,
     save_interview_session,
-    save_vocabulary_word,
     get_user_progress,
     get_activity_counts,
     get_recent_activities,
@@ -30,18 +28,20 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
+# ============================================================
+# DATABASE
+# ============================================================
+
 create_tables()
 
-
-# ============================================================
-# EXTRA DATABASE TABLE FOR GRAMMAR
-# ============================================================
 
 def create_extra_tables():
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS grammar_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -50,7 +50,8 @@ def create_extra_tables():
             feedback TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+        """
+    )
 
     connection.commit()
     connection.close()
@@ -66,7 +67,6 @@ create_extra_tables()
 DEFAULT_SCORES = {
     "Speaking": 0,
     "Grammar": 0,
-    "Vocabulary": 0,
     "Interview": 0,
 }
 
@@ -107,14 +107,10 @@ if "current_interview_type" not in st.session_state:
 # ============================================================
 
 def extract_score(text):
-    if not text:
-        return None
-
     patterns = [
-        r"Overall Speaking Score\s*:\s*(\d{1,3})\s*%",
-        r"Overall Score\s*:\s*(\d{1,3})\s*%",
-        r"Score\s*:\s*(\d{1,3})\s*(?:/100|%)?",
-        r"Score\s*-\s*(\d{1,3})",
+        r"Score\s*:\s*(\d{1,3})\s*/\s*100",
+        r"Score\s*:\s*(\d{1,3})\s*%",
+        r"Score\s*[-:]\s*(\d{1,3})",
     ]
 
     for pattern in patterns:
@@ -156,6 +152,10 @@ def update_score(skill, result):
 
     return score
 
+
+# ============================================================
+# GRAMMAR DATABASE
+# ============================================================
 
 def save_grammar_session(
     user_id,
@@ -215,7 +215,12 @@ def get_grammar_score(user_id):
     return 0
 
 
+# ============================================================
+# LOAD USER PROGRESS
+# ============================================================
+
 def load_user_progress(user_id):
+
     progress = get_user_progress(user_id)
 
     grammar_score = get_grammar_score(user_id)
@@ -226,39 +231,11 @@ def load_user_progress(user_id):
             0
         ),
         "Grammar": grammar_score,
-        "Vocabulary": 0,
         "Interview": progress.get(
             "Interview",
             0
         ),
     }
-
-
-def pronounce_word(word):
-    safe_word = (
-        word
-        .replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
-
-    st.components.v1.html(
-        f"""
-        <script>
-        const utterance =
-            new SpeechSynthesisUtterance("{safe_word}");
-
-        utterance.lang = "en-US";
-        utterance.rate = 0.78;
-        utterance.pitch = 1.0;
-
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-        </script>
-        """,
-        height=5,
-    )
 
 
 # ============================================================
@@ -268,60 +245,101 @@ def pronounce_word(word):
 INTERVIEW_QUESTIONS = {
 
     "HR Interview": [
+
         "Tell me about yourself.",
+
         "What are your greatest strengths?",
+
         "What is one weakness you are working on?",
+
         "Why should we hire you?",
+
         "Where do you see yourself in five years?",
+
         "Why do you want to join our company?",
+
         "How do you handle pressure?",
+
         "Tell me about a time you worked in a team.",
+
         "What motivates you?",
+
         "Why did you choose your field of study?",
     ],
 
     "Technical Interview": [
+
         "Explain the difference between a list and a tuple in Python.",
+
         "What is object-oriented programming?",
+
         "What is the difference between a compiler and an interpreter?",
+
         "What is a database and why is it used?",
+
         "Explain primary key and foreign key.",
+
         "What is an API?",
+
         "What is the difference between frontend and backend?",
+
         "Explain the concept of inheritance in programming.",
+
         "What is the difference between SQL and NoSQL databases?",
+
         "What is version control and why is Git useful?",
     ],
 
     "Python Interview": [
+
         "What are the main features of Python?",
+
         "What is the difference between a list and a tuple?",
+
         "What are Python dictionaries?",
+
         "What is a Python function?",
+
         "What is the difference between == and is?",
+
         "What are *args and **kwargs?",
+
         "What is exception handling in Python?",
+
         "What is list comprehension?",
+
         "What is the difference between shallow copy and deep copy?",
+
         "What are modules and packages in Python?",
     ],
 
     "Communication Round": [
+
         "Tell me about yourself.",
+
         "Describe your biggest achievement.",
+
         "How do you handle disagreements with others?",
+
         "Describe a situation where you showed leadership.",
+
         "How do you manage your time?",
+
         "Tell me about a challenge you faced and how you handled it.",
+
         "How would your friends describe you?",
+
         "What does good communication mean to you?",
+
         "How do you handle constructive criticism?",
+
         "What are your career goals?",
     ],
 }
 
 
 def get_new_interview_question(interview_type):
+
     questions = INTERVIEW_QUESTIONS.get(
         interview_type,
         INTERVIEW_QUESTIONS["HR Interview"]
@@ -333,17 +351,24 @@ def get_new_interview_question(interview_type):
     )
 
     available = [
-        q for q in questions
-        if q not in used
+        question
+        for question in questions
+        if question not in used
     ]
 
     if not available:
+
         used = []
+
         available = questions.copy()
 
-    question = random.choice(available)
+    question = random.choice(
+        available
+    )
 
-    used.append(question)
+    used.append(
+        question
+    )
 
     st.session_state.interview_questions_used[
         interview_type
@@ -372,8 +397,6 @@ st.markdown(
         margin-bottom: 25px;
     }
 
-    /* AI BUTTON */
-
     div.stButton > button[kind="primary"] {
         background-color: #6C63FF;
         color: white;
@@ -386,8 +409,6 @@ st.markdown(
         background-color: #574FE0;
         color: white;
     }
-
-    /* SIDEBAR */
 
     section[data-testid="stSidebar"] {
         padding-top: 1rem;
@@ -432,8 +453,8 @@ if not st.session_state.logged_in:
     )
 
     st.write(
-        "An AI-powered English speaking, grammar, vocabulary "
-        "and interview practice assistant."
+        "An AI-powered English speaking, grammar, "
+        "vocabulary and interview practice assistant."
     )
 
     st.divider()
@@ -443,7 +464,7 @@ if not st.session_state.logged_in:
         [
             "🏠 Home",
             "🔐 Login",
-            "📝 Register"
+            "📝 Register",
         ],
         horizontal=True,
         label_visibility="collapsed",
@@ -456,11 +477,13 @@ if not st.session_state.logged_in:
 
     if option == "🏠 Home":
 
-        st.header("👋 Welcome to SpeakMate AI")
+        st.header(
+            "👋 Welcome to SpeakMate AI"
+        )
 
         st.write(
-            "Build your English communication skills through "
-            "AI-powered practice."
+            "Build your English communication skills "
+            "through AI-powered practice."
         )
 
         c1, c2, c3 = st.columns(3)
@@ -529,7 +552,9 @@ if not st.session_state.logged_in:
 
     elif option == "📝 Register":
 
-        st.header("📝 Create Your SpeakMate Account")
+        st.header(
+            "📝 Create Your SpeakMate Account"
+        )
 
         st.write(
             "Create an account and start improving your English."
@@ -587,7 +612,9 @@ if not st.session_state.logged_in:
 
                     if success:
 
-                        st.success(message)
+                        st.success(
+                            message
+                        )
 
                         st.info(
                             "Account created. "
@@ -596,7 +623,9 @@ if not st.session_state.logged_in:
 
                     else:
 
-                        st.error(message)
+                        st.error(
+                            message
+                        )
 
         with c2:
 
@@ -625,7 +654,9 @@ if not st.session_state.logged_in:
 
     elif option == "🔐 Login":
 
-        st.header("🔐 Welcome Back!")
+        st.header(
+            "🔐 Welcome Back!"
+        )
 
         st.write(
             "Login to continue your English learning journey."
@@ -659,10 +690,11 @@ if not st.session_state.logged_in:
                 if user:
 
                     st.session_state.logged_in = True
+
                     st.session_state.user = user
+
                     st.session_state.page = "Dashboard"
 
-                    # Load saved progress from database
                     load_user_progress(
                         user["id"]
                     )
@@ -742,12 +774,9 @@ else:
 
             ("✍️ Grammar Correction", "Grammar"),
 
-            ("📚 Vocabulary", "Vocabulary"),
-
             ("💼 AI Interview", "Interview"),
 
             ("📈 Progress", "Progress"),
-
         ]
 
         for label, page_name in pages:
@@ -769,7 +798,9 @@ else:
                     key=f"nav_{page_name}"
                 ):
 
-                    go_to(page_name)
+                    go_to(
+                        page_name
+                    )
 
         st.divider()
 
@@ -779,10 +810,16 @@ else:
         ):
 
             st.session_state.logged_in = False
+
             st.session_state.user = None
+
             st.session_state.page = "Dashboard"
+
             st.session_state.conversation_history = []
-            st.session_state.skill_scores = DEFAULT_SCORES.copy()
+
+            st.session_state.skill_scores = (
+                DEFAULT_SCORES.copy()
+            )
 
             st.rerun()
 
@@ -841,7 +878,7 @@ else:
 
         c3.metric(
             "🏆 Skills",
-            f"{len(completed)}/4"
+            f"{len(completed)}/3"
         )
 
         c4.metric(
@@ -874,7 +911,9 @@ else:
                 use_container_width=True
             ):
 
-                go_to("Speaking")
+                go_to(
+                    "Speaking"
+                )
 
         with c2:
 
@@ -893,7 +932,9 @@ else:
                 use_container_width=True
             ):
 
-                go_to("Conversation")
+                go_to(
+                    "Conversation"
+                )
 
         c1, c2 = st.columns(2)
 
@@ -914,30 +955,11 @@ else:
                 use_container_width=True
             ):
 
-                go_to("Grammar")
+                go_to(
+                    "Grammar"
+                )
 
         with c2:
-
-            st.subheader(
-                "📚 Vocabulary"
-            )
-
-            st.write(
-                "Generate vocabulary "
-                "based on your level."
-            )
-
-            if st.button(
-                "📚 Learn Vocabulary",
-                key="dash_vocabulary",
-                use_container_width=True
-            ):
-
-                go_to("Vocabulary")
-
-        c1, c2 = st.columns(2)
-
-        with c1:
 
             st.subheader(
                 "💼 AI Interview"
@@ -954,9 +976,13 @@ else:
                 use_container_width=True
             ):
 
-                go_to("Interview")
+                go_to(
+                    "Interview"
+                )
 
-        with c2:
+        c1, c2 = st.columns(2)
+
+        with c1:
 
             st.subheader(
                 "📈 Progress"
@@ -973,7 +999,9 @@ else:
                 use_container_width=True
             ):
 
-                go_to("Progress")
+                go_to(
+                    "Progress"
+                )
 
 
     # ========================================================
@@ -1023,7 +1051,9 @@ else:
                 "✅ Voice recording captured!"
             )
 
-            st.audio(audio)
+            st.audio(
+                audio
+            )
 
         if st.button(
             "✨ Analyze My Answer with AI",
@@ -1044,7 +1074,8 @@ Student answer:
 
 Return exactly:
 
-Score: NN/100
+Score: [NUMBER]/100
+The NUMBER must be an integer from 0 to 100. Never write NN or a placeholder.
 
 Fluency:
 Give brief feedback.
@@ -1074,7 +1105,9 @@ Be encouraging.
                         "🤖 AI is analyzing your answer..."
                     ):
 
-                        result = ask_ai(prompt)
+                        result = ask_ai(
+                            prompt
+                        )
 
                     score = update_score(
                         "Speaking",
@@ -1094,7 +1127,9 @@ Be encouraging.
                         "🤖 AI Speaking Feedback"
                     )
 
-                    st.markdown(result)
+                    st.markdown(
+                        result
+                    )
 
                 except Exception as e:
 
@@ -1133,7 +1168,9 @@ Be encouraging.
                         "🤖 AI Voice Speaking Feedback"
                     )
 
-                    st.markdown(result)
+                    st.markdown(
+                        result
+                    )
 
                 except Exception as e:
 
@@ -1262,7 +1299,8 @@ Student sentence:
 
 Return exactly these sections:
 
-Score: NN/100
+Score: [NUMBER]/100
+The NUMBER must be an integer from 0 to 100. Never write NN or a placeholder.
 
 Corrected Sentence:
 Give the correct sentence.
@@ -1288,7 +1326,9 @@ Be encouraging and suitable for a college student.
                         "AI is checking your grammar..."
                     ):
 
-                        result = ask_ai(prompt)
+                        result = ask_ai(
+                            prompt
+                        )
 
                     score = update_score(
                         "Grammar",
@@ -1309,252 +1349,9 @@ Be encouraging and suitable for a college student.
                         "🤖 AI Grammar Feedback"
                     )
 
-                    st.markdown(result)
-
-                except Exception as e:
-
-                    st.error(
-                        f"AI error: {e}"
-                    )
-
-
-    # ========================================================
-    # VOCABULARY
-    # ========================================================
-
-    elif st.session_state.page == "Vocabulary":
-
-        st.title(
-            "📚 AI Vocabulary Builder"
-        )
-
-        st.write(
-            "Learn useful English words "
-            "based on your level."
-        )
-
-        st.divider()
-
-        level = st.selectbox(
-            "🎯 Choose your English level",
-            [
-                "Beginner",
-                "Intermediate",
-                "Advanced"
-            ]
-        )
-
-        if st.button(
-            "✨ Generate Vocabulary",
-            type="primary",
-            use_container_width=True
-        ):
-
-            prompt = f"""
-You are an English vocabulary tutor.
-
-Student level:
-{level}
-
-Generate exactly 4 useful English vocabulary words
-appropriate for this level.
-
-For each word provide:
-
-WORD:
-MEANING:
-EXAMPLE:
-
-Rules:
-- Generate ONLY 4 words.
-- Meaning must be very short.
-- Example must be one short natural sentence.
-- No synonyms.
-- No opposites.
-- No long explanations.
-- No scores.
-- Words should be useful for a college student.
-- Difficulty must match the {level} level.
-
-Return ONLY this format:
-
-WORD: example
-MEANING: short meaning
-EXAMPLE: short sentence
-
-WORD: example
-MEANING: short meaning
-EXAMPLE: short sentence
-
-WORD: example
-MEANING: short meaning
-EXAMPLE: short sentence
-
-WORD: example
-MEANING: short meaning
-EXAMPLE: short sentence
-"""
-
-            try:
-
-                with st.spinner(
-                    "🤖 AI is generating vocabulary..."
-                ):
-
-                    result = ask_ai(prompt)
-
-                st.session_state.vocabulary_result = result
-                st.session_state.vocabulary_level = level
-
-            except Exception as e:
-
-                st.error(
-                    f"AI error: {e}"
-                )
-
-        if st.session_state.vocabulary_result:
-
-            st.divider()
-
-            st.subheader(
-                f"🧠 {st.session_state.vocabulary_level} Vocabulary"
-            )
-
-            result = st.session_state.vocabulary_result
-
-            pattern = re.compile(
-                r"WORD:\s*(.*?)\s*"
-                r"MEANING:\s*(.*?)\s*"
-                r"EXAMPLE:\s*(.*?)"
-                r"(?=\s*WORD:|\s*$)",
-                re.IGNORECASE | re.DOTALL
-            )
-
-            words = pattern.findall(result)
-
-            if words:
-
-                for index, (
-                    word,
-                    meaning,
-                    example
-                ) in enumerate(
-                    words,
-                    start=1
-                ):
-
-                    word = word.strip()
-                    meaning = meaning.strip()
-                    example = example.strip()
-
-                    col1, col2 = st.columns(
-                        [6, 1]
-                    )
-
-                    with col1:
-
-                        st.markdown(
-                            f"### {index}. {word}"
-                        )
-
-                        st.write(
-                            f"**Meaning:** {meaning}"
-                        )
-
-                        st.write(
-                            f"**Example:** {example}"
-                        )
-
-                    with col2:
-
-                        st.write("")
-
-                        if st.button(
-                            "🔊",
-                            key=f"pronounce_{index}"
-                        ):
-
-                            pronounce_word(word)
-
-                    # Save vocabulary word
-                    try:
-
-                        save_vocabulary_word(
-                            user["id"],
-                            word,
-                            meaning,
-                            example
-                        )
-
-                    except Exception:
-                        pass
-
-                    st.divider()
-
-            else:
-
-                st.markdown(result)
-
-        st.subheader(
-            "💬 Ask AI About Vocabulary"
-        )
-
-        vocabulary_question = st.text_input(
-            "Ask your vocabulary question",
-            placeholder="Example: What does 'adapt' mean?"
-        )
-
-        if st.button(
-            "🤖 Ask AI",
-            use_container_width=True
-        ):
-
-            if not vocabulary_question.strip():
-
-                st.warning(
-                    "Please enter a word or question."
-                )
-
-            else:
-
-                question_prompt = f"""
-You are a friendly English vocabulary tutor.
-
-Student level:
-{level}
-
-Student question:
-{vocabulary_question}
-
-Answer briefly.
-
-If the student asks about a word, provide:
-
-Word:
-Meaning:
-Example:
-
-Keep the meaning simple and short.
-Give only one short example sentence.
-
-Do not give long explanations.
-"""
-
-                try:
-
-                    with st.spinner(
-                        "🤖 AI is answering..."
-                    ):
-
-                        answer = ask_ai(
-                            question_prompt
-                        )
-
                     st.markdown(
-                        "### 🤖 AI Answer"
+                        result
                     )
-
-                    st.markdown(answer)
 
                 except Exception as e:
 
@@ -1575,7 +1372,7 @@ Do not give long explanations.
 
         st.write(
             "Practice different interview questions "
-            "based on your selected interview type."
+            "using text or your voice."
         )
 
         interview_type = st.selectbox(
@@ -1584,14 +1381,14 @@ Do not give long explanations.
                 "HR Interview",
                 "Technical Interview",
                 "Python Interview",
-                "Communication Round"
+                "Communication Round",
             ],
             key="interview_type_select"
         )
 
 
         # ----------------------------------------------------
-        # CREATE NEW QUESTION WHEN CATEGORY CHANGES
+        # CREATE QUESTION WHEN CATEGORY CHANGES
         # ----------------------------------------------------
 
         if (
@@ -1611,7 +1408,7 @@ Do not give long explanations.
 
 
         # ----------------------------------------------------
-        # IF NO QUESTION EXISTS
+        # CREATE QUESTION IF NONE EXISTS
         # ----------------------------------------------------
 
         if (
@@ -1645,7 +1442,7 @@ Do not give long explanations.
 
 
         # ----------------------------------------------------
-        # NEXT QUESTION BUTTON
+        # NEXT QUESTION
         # ----------------------------------------------------
 
         if st.button(
@@ -1662,12 +1459,44 @@ Do not give long explanations.
             st.rerun()
 
 
+        # ----------------------------------------------------
+        # TEXT ANSWER
+        # ----------------------------------------------------
+
         answer = st.text_area(
-            "Your Answer",
+            "⌨️ Type Your Answer",
             height=180,
             placeholder="Type your interview answer here..."
         )
 
+
+        # ----------------------------------------------------
+        # VOICE ANSWER
+        # ----------------------------------------------------
+
+        st.write(
+            "### 🎤 Or Speak Your Answer"
+        )
+
+        audio = st.audio_input(
+            "🎤 Record your interview answer"
+        )
+
+
+        if audio is not None:
+
+            st.success(
+                "✅ Voice recording captured!"
+            )
+
+            st.audio(
+                audio
+            )
+
+
+        # ----------------------------------------------------
+        # EVALUATE
+        # ----------------------------------------------------
 
         if st.button(
             "✨ Evaluate Answer with AI",
@@ -1675,15 +1504,65 @@ Do not give long explanations.
             use_container_width=True
         ):
 
-            if not answer.strip():
+            if not answer.strip() and audio is None:
 
                 st.warning(
-                    "Please enter your answer."
+                    "Please type your answer or "
+                    "record your voice first."
                 )
 
             else:
 
-                prompt = f"""
+                try:
+
+                    # ==================================================
+                    # VOICE INTERVIEW
+                    # ==================================================
+
+                    if audio is not None and not answer.strip():
+
+                        with st.spinner(
+                            "🎤 AI is listening to your interview answer..."
+                        ):
+
+                            result = analyze_voice(
+                                audio.getvalue(),
+                                question
+                            )
+
+                        score = update_score(
+                            "Interview",
+                            result
+                        )
+
+                        if score is None:
+                            score = 0
+
+                        save_interview_session(
+                            user["id"],
+                            interview_type,
+                            question,
+                            "Voice Answer",
+                            score,
+                            result
+                        )
+
+                        st.subheader(
+                            "🤖 AI Interview Feedback"
+                        )
+
+                        st.markdown(
+                            result
+                        )
+
+
+                    # ==================================================
+                    # TEXT INTERVIEW
+                    # ==================================================
+
+                    else:
+
+                        prompt = f"""
 You are a professional interview coach.
 
 Interview type:
@@ -1699,7 +1578,8 @@ Evaluate the answer.
 
 Return exactly these sections:
 
-Score: NN/100
+Score: [NUMBER]/100
+The NUMBER must be an integer from 0 to 100. Never write NN or a placeholder.
 
 Strengths:
 Mention what was done well.
@@ -1725,45 +1605,43 @@ Ask one realistic interviewer question.
 Be honest but encouraging.
 """
 
-                try:
+                        with st.spinner(
+                            "🤖 AI is evaluating your answer..."
+                        ):
 
-                    with st.spinner(
-                        "🤖 AI is evaluating your answer..."
-                    ):
+                            result = ask_ai(
+                                prompt
+                            )
 
-                        result = ask_ai(
-                            prompt
+                        score = update_score(
+                            "Interview",
+                            result
                         )
 
-                    score = update_score(
-                        "Interview",
-                        result
-                    )
+                        if score is None:
+                            score = 0
 
-                    if score is None:
-                        score = 0
+                        save_interview_session(
+                            user["id"],
+                            interview_type,
+                            question,
+                            answer,
+                            score,
+                            result
+                        )
 
-                    save_interview_session(
-                        user["id"],
-                        interview_type,
-                        question,
-                        answer,
-                        score,
-                        result
-                    )
+                        st.subheader(
+                            "🤖 AI Interview Feedback"
+                        )
 
-                    st.subheader(
-                        "🤖 AI Interview Feedback"
-                    )
-
-                    st.markdown(
-                        result
-                    )
+                        st.markdown(
+                            result
+                        )
 
                 except Exception as e:
 
                     st.error(
-                        f"AI error: {e}"
+                        f"Interview AI error: {e}"
                     )
 
 
@@ -1777,7 +1655,6 @@ Be honest but encouraging.
             "📈 Your AI Learning Progress"
         )
 
-        # Reload database progress
         load_user_progress(
             user["id"]
         )
@@ -1789,6 +1666,11 @@ Be honest but encouraging.
         )
 
         st.divider()
+
+
+        # ----------------------------------------------------
+        # SKILL SCORES
+        # ----------------------------------------------------
 
         for skill, score in scores.items():
 
@@ -1811,11 +1693,13 @@ Be honest but encouraging.
                     f"### {skill} — Not attempted yet"
                 )
 
+
         completed = [
             score
             for score in scores.values()
             if score > 0
         ]
+
 
         if completed:
 
@@ -1886,7 +1770,6 @@ Current scores:
 
 Speaking: {scores['Speaking']}%
 Grammar: {scores['Grammar']}%
-Vocabulary: {scores['Vocabulary']}%
 Interview: {scores['Interview']}%
 
 Give a short personalized progress report.
