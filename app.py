@@ -1,6 +1,7 @@
 import re
 import random
 import streamlit as st
+import pandas as pd
 
 from database import (
     create_tables,
@@ -11,6 +12,7 @@ from database import (
     get_activity_counts,
     get_recent_activities,
     get_streak,
+    get_daily_progress,
 )
 
 from auth import register_user, login_user
@@ -70,7 +72,6 @@ DEFAULT_SCORES = {
     "Interview": 0,
 }
 
-
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -107,13 +108,16 @@ if "current_interview_type" not in st.session_state:
 # ============================================================
 
 def extract_score(text):
+
     patterns = [
         r"Score\s*:\s*(\d{1,3})\s*/\s*100",
         r"Score\s*:\s*(\d{1,3})\s*%",
+        r"Overall Speaking Score\s*:\s*(\d{1,3})\s*%",
         r"Score\s*[-:]\s*(\d{1,3})",
     ]
 
     for pattern in patterns:
+
         match = re.search(
             pattern,
             text,
@@ -121,18 +125,20 @@ def extract_score(text):
         )
 
         if match:
+
             return max(
                 0,
                 min(
                     100,
-                    int(match.group(1))
-                )
+                    int(match.group(1)
+                ))
             )
 
     return None
 
 
 def ask_ai(prompt):
+
     return get_ai_response(
         prompt,
         []
@@ -140,11 +146,13 @@ def ask_ai(prompt):
 
 
 def go_to(page):
+
     st.session_state.page = page
     st.rerun()
 
 
 def update_score(skill, result):
+
     score = extract_score(result)
 
     if score is not None:
@@ -163,6 +171,7 @@ def save_grammar_session(
     score,
     feedback
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -190,6 +199,7 @@ def save_grammar_session(
 
 
 def get_grammar_score(user_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -226,15 +236,9 @@ def load_user_progress(user_id):
     grammar_score = get_grammar_score(user_id)
 
     st.session_state.skill_scores = {
-        "Speaking": progress.get(
-            "Speaking",
-            0
-        ),
+        "Speaking": progress.get("Speaking", 0),
         "Grammar": grammar_score,
-        "Interview": progress.get(
-            "Interview",
-            0
-        ),
+        "Interview": progress.get("Interview", 0),
     }
 
 
@@ -359,16 +363,11 @@ def get_new_interview_question(interview_type):
     if not available:
 
         used = []
-
         available = questions.copy()
 
-    question = random.choice(
-        available
-    )
+    question = random.choice(available)
 
-    used.append(
-        question
-    )
+    used.append(question)
 
     st.session_state.interview_questions_used[
         interview_type
@@ -428,6 +427,13 @@ st.markdown(
         color: #777;
     }
 
+    .progress-card {
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid rgba(128,128,128,0.25);
+        margin-bottom: 20px;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -477,9 +483,7 @@ if not st.session_state.logged_in:
 
     if option == "🏠 Home":
 
-        st.header(
-            "👋 Welcome to SpeakMate AI"
-        )
+        st.header("👋 Welcome to SpeakMate AI")
 
         st.write(
             "Build your English communication skills "
@@ -489,7 +493,6 @@ if not st.session_state.logged_in:
         c1, c2, c3 = st.columns(3)
 
         with c1:
-
             st.info(
                 """
                 ### 🎤 Speaking Practice
@@ -500,7 +503,6 @@ if not st.session_state.logged_in:
             )
 
         with c2:
-
             st.info(
                 """
                 ### 🤖 AI Conversation
@@ -511,7 +513,6 @@ if not st.session_state.logged_in:
             )
 
         with c3:
-
             st.info(
                 """
                 ### 💼 AI Interview
@@ -524,7 +525,6 @@ if not st.session_state.logged_in:
         c1, c2 = st.columns(2)
 
         with c1:
-
             st.success(
                 """
                 ### ✍️ Grammar Correction
@@ -535,7 +535,6 @@ if not st.session_state.logged_in:
             )
 
         with c2:
-
             st.success(
                 """
                 ### 📚 Vocabulary Builder
@@ -552,9 +551,7 @@ if not st.session_state.logged_in:
 
     elif option == "📝 Register":
 
-        st.header(
-            "📝 Create Your SpeakMate Account"
-        )
+        st.header("📝 Create Your SpeakMate Account")
 
         st.write(
             "Create an account and start improving your English."
@@ -612,9 +609,7 @@ if not st.session_state.logged_in:
 
                     if success:
 
-                        st.success(
-                            message
-                        )
+                        st.success(message)
 
                         st.info(
                             "Account created. "
@@ -623,9 +618,7 @@ if not st.session_state.logged_in:
 
                     else:
 
-                        st.error(
-                            message
-                        )
+                        st.error(message)
 
         with c2:
 
@@ -654,9 +647,7 @@ if not st.session_state.logged_in:
 
     elif option == "🔐 Login":
 
-        st.header(
-            "🔐 Welcome Back!"
-        )
+        st.header("🔐 Welcome Back!")
 
         st.write(
             "Login to continue your English learning journey."
@@ -690,9 +681,7 @@ if not st.session_state.logged_in:
                 if user:
 
                     st.session_state.logged_in = True
-
                     st.session_state.user = user
-
                     st.session_state.page = "Dashboard"
 
                     load_user_progress(
@@ -747,9 +736,7 @@ else:
 
     with st.sidebar:
 
-        st.markdown(
-            "## 🎤 SpeakMate AI"
-        )
+        st.markdown("## 🎤 SpeakMate AI")
 
         st.write(
             f"👋 Hello, **{user['name']}**"
@@ -765,17 +752,11 @@ else:
         st.divider()
 
         pages = [
-
             ("🏠 Dashboard", "Dashboard"),
-
             ("🎤 Speaking Practice", "Speaking"),
-
             ("🤖 AI Conversation", "Conversation"),
-
             ("✍️ Grammar Correction", "Grammar"),
-
             ("💼 AI Interview", "Interview"),
-
             ("📈 Progress", "Progress"),
         ]
 
@@ -798,9 +779,7 @@ else:
                     key=f"nav_{page_name}"
                 ):
 
-                    go_to(
-                        page_name
-                    )
+                    go_to(page_name)
 
         st.divider()
 
@@ -810,16 +789,10 @@ else:
         ):
 
             st.session_state.logged_in = False
-
             st.session_state.user = None
-
             st.session_state.page = "Dashboard"
-
             st.session_state.conversation_history = []
-
-            st.session_state.skill_scores = (
-                DEFAULT_SCORES.copy()
-            )
+            st.session_state.skill_scores = DEFAULT_SCORES.copy()
 
             st.rerun()
 
@@ -888,17 +861,13 @@ else:
 
         st.divider()
 
-        st.header(
-            "🚀 Start Practicing"
-        )
+        st.header("🚀 Start Practicing")
 
         c1, c2 = st.columns(2)
 
         with c1:
 
-            st.subheader(
-                "🎤 Speaking Practice"
-            )
+            st.subheader("🎤 Speaking Practice")
 
             st.write(
                 "Practice English by typing "
@@ -911,15 +880,11 @@ else:
                 use_container_width=True
             ):
 
-                go_to(
-                    "Speaking"
-                )
+                go_to("Speaking")
 
         with c2:
 
-            st.subheader(
-                "🤖 AI Conversation"
-            )
+            st.subheader("🤖 AI Conversation")
 
             st.write(
                 "Practice a natural conversation "
@@ -932,17 +897,13 @@ else:
                 use_container_width=True
             ):
 
-                go_to(
-                    "Conversation"
-                )
+                go_to("Conversation")
 
         c1, c2 = st.columns(2)
 
         with c1:
 
-            st.subheader(
-                "✍️ Grammar Correction"
-            )
+            st.subheader("✍️ Grammar Correction")
 
             st.write(
                 "Find mistakes and learn "
@@ -955,15 +916,11 @@ else:
                 use_container_width=True
             ):
 
-                go_to(
-                    "Grammar"
-                )
+                go_to("Grammar")
 
         with c2:
 
-            st.subheader(
-                "💼 AI Interview"
-            )
+            st.subheader("💼 AI Interview")
 
             st.write(
                 "Practice interview questions "
@@ -976,17 +933,13 @@ else:
                 use_container_width=True
             ):
 
-                go_to(
-                    "Interview"
-                )
+                go_to("Interview")
 
         c1, c2 = st.columns(2)
 
         with c1:
 
-            st.subheader(
-                "📈 Progress"
-            )
+            st.subheader("📈 Progress")
 
             st.write(
                 "Track your English "
@@ -999,9 +952,7 @@ else:
                 use_container_width=True
             ):
 
-                go_to(
-                    "Progress"
-                )
+                go_to("Progress")
 
 
     # ========================================================
@@ -1010,9 +961,7 @@ else:
 
     elif st.session_state.page == "Speaking":
 
-        st.title(
-            "🎤 English Speaking Practice"
-        )
+        st.title("🎤 English Speaking Practice")
 
         st.write(
             "Choose a topic and answer by "
@@ -1051,9 +1000,7 @@ else:
                 "✅ Voice recording captured!"
             )
 
-            st.audio(
-                audio
-            )
+            st.audio(audio)
 
         if st.button(
             "✨ Analyze My Answer with AI",
@@ -1105,9 +1052,7 @@ Be encouraging.
                         "🤖 AI is analyzing your answer..."
                     ):
 
-                        result = ask_ai(
-                            prompt
-                        )
+                        result = ask_ai(prompt)
 
                     score = update_score(
                         "Speaking",
@@ -1127,9 +1072,7 @@ Be encouraging.
                         "🤖 AI Speaking Feedback"
                     )
 
-                    st.markdown(
-                        result
-                    )
+                    st.markdown(result)
 
                 except Exception as e:
 
@@ -1168,9 +1111,7 @@ Be encouraging.
                         "🤖 AI Voice Speaking Feedback"
                     )
 
-                    st.markdown(
-                        result
-                    )
+                    st.markdown(result)
 
                 except Exception as e:
 
@@ -1192,9 +1133,7 @@ Be encouraging.
 
     elif st.session_state.page == "Conversation":
 
-        st.title(
-            "🤖 AI Conversation"
-        )
+        st.title("🤖 AI Conversation")
 
         st.success(
             "🟢 AI Conversation is active."
@@ -1262,9 +1201,7 @@ Be encouraging.
 
     elif st.session_state.page == "Grammar":
 
-        st.title(
-            "✍️ Grammar Correction"
-        )
+        st.title("✍️ Grammar Correction")
 
         st.write(
             "Enter a sentence and AI "
@@ -1326,9 +1263,7 @@ Be encouraging and suitable for a college student.
                         "AI is checking your grammar..."
                     ):
 
-                        result = ask_ai(
-                            prompt
-                        )
+                        result = ask_ai(prompt)
 
                     score = update_score(
                         "Grammar",
@@ -1349,9 +1284,7 @@ Be encouraging and suitable for a college student.
                         "🤖 AI Grammar Feedback"
                     )
 
-                    st.markdown(
-                        result
-                    )
+                    st.markdown(result)
 
                 except Exception as e:
 
@@ -1366,9 +1299,7 @@ Be encouraging and suitable for a college student.
 
     elif st.session_state.page == "Interview":
 
-        st.title(
-            "💼 AI Interview Practice"
-        )
+        st.title("💼 AI Interview Practice")
 
         st.write(
             "Practice different interview questions "
@@ -1386,11 +1317,6 @@ Be encouraging and suitable for a college student.
             key="interview_type_select"
         )
 
-
-        # ----------------------------------------------------
-        # CREATE QUESTION WHEN CATEGORY CHANGES
-        # ----------------------------------------------------
-
         if (
             st.session_state.current_interview_type
             != interview_type
@@ -1406,11 +1332,6 @@ Be encouraging and suitable for a college student.
                 )
             )
 
-
-        # ----------------------------------------------------
-        # CREATE QUESTION IF NONE EXISTS
-        # ----------------------------------------------------
-
         if (
             st.session_state.current_interview_question
             is None
@@ -1422,28 +1343,19 @@ Be encouraging and suitable for a college student.
                 )
             )
 
-
         question = (
             st.session_state.current_interview_question
         )
-
 
         st.info(
             f"**Interview Type:** {interview_type}"
         )
 
-        st.subheader(
-            "Question"
-        )
+        st.subheader("Question")
 
         st.write(
             f"### {question}"
         )
-
-
-        # ----------------------------------------------------
-        # NEXT QUESTION
-        # ----------------------------------------------------
 
         if st.button(
             "🔄 Give Me Another Question",
@@ -1458,30 +1370,17 @@ Be encouraging and suitable for a college student.
 
             st.rerun()
 
-
-        # ----------------------------------------------------
-        # TEXT ANSWER
-        # ----------------------------------------------------
-
         answer = st.text_area(
             "⌨️ Type Your Answer",
             height=180,
             placeholder="Type your interview answer here..."
         )
 
-
-        # ----------------------------------------------------
-        # VOICE ANSWER
-        # ----------------------------------------------------
-
-        st.write(
-            "### 🎤 Or Speak Your Answer"
-        )
+        st.write("### 🎤 Or Speak Your Answer")
 
         audio = st.audio_input(
             "🎤 Record your interview answer"
         )
-
 
         if audio is not None:
 
@@ -1489,14 +1388,7 @@ Be encouraging and suitable for a college student.
                 "✅ Voice recording captured!"
             )
 
-            st.audio(
-                audio
-            )
-
-
-        # ----------------------------------------------------
-        # EVALUATE
-        # ----------------------------------------------------
+            st.audio(audio)
 
         if st.button(
             "✨ Evaluate Answer with AI",
@@ -1514,10 +1406,6 @@ Be encouraging and suitable for a college student.
             else:
 
                 try:
-
-                    # ==================================================
-                    # VOICE INTERVIEW
-                    # ==================================================
 
                     if audio is not None and not answer.strip():
 
@@ -1551,14 +1439,7 @@ Be encouraging and suitable for a college student.
                             "🤖 AI Interview Feedback"
                         )
 
-                        st.markdown(
-                            result
-                        )
-
-
-                    # ==================================================
-                    # TEXT INTERVIEW
-                    # ==================================================
+                        st.markdown(result)
 
                     else:
 
@@ -1609,9 +1490,7 @@ Be honest but encouraging.
                             "🤖 AI is evaluating your answer..."
                         ):
 
-                            result = ask_ai(
-                                prompt
-                            )
+                            result = ask_ai(prompt)
 
                         score = update_score(
                             "Interview",
@@ -1634,9 +1513,7 @@ Be honest but encouraging.
                             "🤖 AI Interview Feedback"
                         )
 
-                        st.markdown(
-                            result
-                        )
+                        st.markdown(result)
 
                 except Exception as e:
 
@@ -1668,9 +1545,177 @@ Be honest but encouraging.
         st.divider()
 
 
-        # ----------------------------------------------------
+        # ====================================================
+        # DAILY PROGRESS GRAPH
+        # ====================================================
+
+        st.subheader(
+            "📊 Daily Learning Progress"
+        )
+
+        st.caption(
+            "Track how your English performance changes "
+            "across your daily practice sessions."
+        )
+
+        try:
+
+            daily_progress = get_daily_progress(
+                user["id"],
+                days=30
+            )
+
+            if daily_progress:
+
+                progress_df = pd.DataFrame(
+                    daily_progress
+                )
+
+                progress_df["Date"] = pd.to_datetime(
+                    progress_df["Date"]
+                )
+
+                progress_df = progress_df.sort_values(
+                    "Date"
+                )
+
+                progress_df = progress_df.set_index(
+                    "Date"
+                )
+
+                # --------------------------------------------
+                # PROFESSIONAL METRICS
+                # --------------------------------------------
+
+                latest_score = float(
+                    progress_df["Score"].iloc[-1]
+                )
+
+                best_score = float(
+                    progress_df["Score"].max()
+                )
+
+                total_days = len(
+                    progress_df
+                )
+
+                total_activities = int(
+                    progress_df["Activities"].sum()
+                )
+
+                m1, m2, m3, m4 = st.columns(4)
+
+                m1.metric(
+                    "📅 Practice Days",
+                    total_days
+                )
+
+                m2.metric(
+                    "📈 Latest Score",
+                    f"{latest_score:.0f}%"
+                )
+
+                m3.metric(
+                    "🏆 Best Score",
+                    f"{best_score:.0f}%"
+                )
+
+                m4.metric(
+                    "🎯 Activities",
+                    total_activities
+                )
+
+                st.markdown("")
+
+                # --------------------------------------------
+                # MAIN PROFESSIONAL TREND GRAPH
+                # --------------------------------------------
+
+                chart_data = progress_df[
+                    ["Score"]
+                ].rename(
+                    columns={
+                        "Score": "Average Score (%)"
+                    }
+                )
+
+                st.line_chart(
+                    chart_data,
+                    height=400,
+                    use_container_width=True
+                )
+
+                st.caption(
+                    "The graph represents your average score "
+                    "for each day on which you practiced."
+                )
+
+                # --------------------------------------------
+                # DAILY ACTIVITY TABLE
+                # --------------------------------------------
+
+                with st.expander(
+                    "📋 View Daily Progress Details"
+                ):
+
+                    display_df = progress_df.reset_index()
+
+                    display_df["Date"] = (
+                        display_df["Date"]
+                        .dt.strftime("%d %b %Y")
+                    )
+
+                    display_df["Score"] = (
+                        display_df["Score"]
+                        .round(0)
+                        .astype(int)
+                        .astype(str)
+                        + "%"
+                    )
+
+                    display_df = display_df.rename(
+                        columns={
+                            "Date": "Practice Date",
+                            "Score": "Average Score",
+                            "Activities": "Activities Completed"
+                        }
+                    )
+
+                    st.dataframe(
+                        display_df,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+            else:
+
+                st.info(
+                    "🎤 Complete your first Speaking, "
+                    "Grammar, or Interview activity to "
+                    "start tracking your daily progress."
+                )
+
+        except Exception as e:
+
+            st.warning(
+                "Daily progress graph could not be loaded yet."
+            )
+
+            st.caption(
+                f"Technical detail: {e}"
+            )
+
+
+        st.divider()
+
+
+        # ====================================================
         # SKILL SCORES
-        # ----------------------------------------------------
+        # ====================================================
+
+        st.subheader(
+            "🎯 Current Skill Scores"
+        )
 
         for skill, score in scores.items():
 
@@ -1715,9 +1760,9 @@ Be honest but encouraging.
             )
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # ACTIVITY HISTORY
-        # ----------------------------------------------------
+        # ====================================================
 
         st.divider()
 
@@ -1757,9 +1802,9 @@ Be honest but encouraging.
             )
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # AI PROGRESS COACH
-        # ----------------------------------------------------
+        # ====================================================
 
         if completed:
 

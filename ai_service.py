@@ -13,8 +13,8 @@ api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
     raise ValueError(
-        "GROQ_API_KEY was not found. Make sure your .env file contains "
-        "GROQ_API_KEY=your_api_key"
+        "GROQ_API_KEY was not found. "
+        "Make sure your .env file contains GROQ_API_KEY=your_api_key"
     )
 
 
@@ -35,7 +35,7 @@ def get_ai_response(user_text, user_answer=None):
     """
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-20b",
 
         messages=[
             {
@@ -49,7 +49,6 @@ def get_ai_response(user_text, user_answer=None):
                     "Do not give separate percentage scores."
                 )
             },
-
             {
                 "role": "user",
                 "content": (
@@ -72,9 +71,9 @@ def get_ai_response(user_text, user_answer=None):
 
 def analyze_voice(audio_data, context=None):
     """
-    1. Convert recorded audio into text using Whisper.
-    2. Send the transcript to Llama.
-    3. Return ONE overall speaking percentage and feedback.
+    1. Convert recorded audio into text using Groq Whisper.
+    2. Send transcript to Groq Llama.
+    3. Return one overall speaking score and feedback.
     """
 
     # --------------------------------------------------------
@@ -89,7 +88,7 @@ def analyze_voice(audio_data, context=None):
     else:
 
         # ----------------------------------------------------
-        # Convert Streamlit uploaded/recorded audio to bytes
+        # CONVERT STREAMLIT AUDIO TO BYTES
         # ----------------------------------------------------
 
         if hasattr(audio_data, "getvalue"):
@@ -105,7 +104,7 @@ def analyze_voice(audio_data, context=None):
             audio_bytes = bytes(audio_data)
 
         # ----------------------------------------------------
-        # SPEECH TO TEXT USING WHISPER
+        # SPEECH TO TEXT USING GROQ WHISPER
         # ----------------------------------------------------
 
         transcription = client.audio.transcriptions.create(
@@ -117,7 +116,6 @@ def analyze_voice(audio_data, context=None):
         )
 
         transcript = transcription.text
-
 
     # --------------------------------------------------------
     # LIMIT TEXT LENGTH
@@ -132,7 +130,6 @@ def analyze_voice(audio_data, context=None):
             "Please record your answer again."
         )
 
-
     # --------------------------------------------------------
     # CONTEXT
     # --------------------------------------------------------
@@ -142,13 +139,12 @@ def analyze_voice(audio_data, context=None):
     else:
         context = "No additional context provided."
 
-
     # --------------------------------------------------------
     # STEP 2: AI SPEAKING ANALYSIS
     # --------------------------------------------------------
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-20b",
 
         messages=[
             {
@@ -177,7 +173,6 @@ def analyze_voice(audio_data, context=None):
                     "Keep the response concise and encouraging."
                 )
             },
-
             {
                 "role": "user",
                 "content": (

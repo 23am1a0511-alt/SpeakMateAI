@@ -20,6 +20,7 @@ def get_connection():
 # ============================================================
 
 def create_tables():
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -57,17 +58,16 @@ def create_tables():
     """)
 
     # --------------------------------------------------------
-    # VOCABULARY
+    # GRAMMAR SESSIONS
     # --------------------------------------------------------
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS vocabulary (
+        CREATE TABLE IF NOT EXISTS grammar_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            word TEXT NOT NULL,
-            meaning TEXT,
-            example TEXT,
-            learned INTEGER DEFAULT 0,
+            sentence TEXT,
+            score REAL,
+            feedback TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
@@ -137,6 +137,7 @@ def save_speaking_session(
     vocabulary_score=0,
     pronunciation_score=0
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -168,6 +169,41 @@ def save_speaking_session(
 
 
 # ============================================================
+# SAVE GRAMMAR ACTIVITY
+# ============================================================
+
+def save_grammar_session(
+    user_id,
+    sentence,
+    score,
+    feedback
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO grammar_sessions (
+            user_id,
+            sentence,
+            score,
+            feedback
+        )
+        VALUES (?, ?, ?, ?)
+    """, (
+        user_id,
+        sentence,
+        score,
+        feedback
+    ))
+
+    connection.commit()
+    connection.close()
+
+    update_streak(user_id)
+
+
+# ============================================================
 # SAVE INTERVIEW ACTIVITY
 # ============================================================
 
@@ -179,6 +215,7 @@ def save_interview_session(
     score,
     feedback
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -208,42 +245,11 @@ def save_interview_session(
 
 
 # ============================================================
-# SAVE VOCABULARY WORD
-# ============================================================
-
-def save_vocabulary_word(
-    user_id,
-    word,
-    meaning="",
-    example=""
-):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute("""
-        INSERT INTO vocabulary (
-            user_id,
-            word,
-            meaning,
-            example
-        )
-        VALUES (?, ?, ?, ?)
-    """, (
-        user_id,
-        word,
-        meaning,
-        example
-    ))
-
-    connection.commit()
-    connection.close()
-
-
-# ============================================================
 # GET USER SPEAKING SCORE
 # ============================================================
 
 def get_speaking_score(user_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -267,10 +273,39 @@ def get_speaking_score(user_id):
 
 
 # ============================================================
+# GET USER GRAMMAR SCORE
+# ============================================================
+
+def get_grammar_score(user_id):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT score
+        FROM grammar_sessions
+        WHERE user_id = ?
+        AND score IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+    """, (user_id,))
+
+    row = cursor.fetchone()
+
+    connection.close()
+
+    if row:
+        return float(row["score"])
+
+    return 0
+
+
+# ============================================================
 # GET USER INTERVIEW SCORE
 # ============================================================
 
 def get_interview_score(user_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -298,6 +333,7 @@ def get_interview_score(user_id):
 # ============================================================
 
 def get_activity_counts(user_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -319,18 +355,18 @@ def get_activity_counts(user_id):
 
     cursor.execute("""
         SELECT COUNT(*)
-        FROM vocabulary
+        FROM grammar_sessions
         WHERE user_id = ?
     """, (user_id,))
 
-    vocabulary_count = cursor.fetchone()[0]
+    grammar_count = cursor.fetchone()[0]
 
     connection.close()
 
     return {
         "Speaking": speaking_count,
-        "Interview": interview_count,
-        "Vocabulary": vocabulary_count
+        "Grammar": grammar_count,
+        "Interview": interview_count
     }
 
 
@@ -339,13 +375,14 @@ def get_activity_counts(user_id):
 # ============================================================
 
 def get_user_progress(user_id):
+
     speaking_score = get_speaking_score(user_id)
+    grammar_score = get_grammar_score(user_id)
     interview_score = get_interview_score(user_id)
 
     return {
         "Speaking": speaking_score,
-        "Grammar": 0,
-        "Vocabulary": 0,
+        "Grammar": grammar_score,
         "Interview": interview_score
     }
 
@@ -355,10 +392,15 @@ def get_user_progress(user_id):
 # ============================================================
 
 def get_recent_activities(user_id, limit=10):
+
     connection = get_connection()
     cursor = connection.cursor()
 
     activities = []
+
+    # --------------------------------------------------------
+    # SPEAKING
+    # --------------------------------------------------------
 
     cursor.execute("""
         SELECT
@@ -374,11 +416,41 @@ def get_recent_activities(user_id, limit=10):
     speaking_rows = cursor.fetchall()
 
     for row in speaking_rows:
+
         activities.append({
             "activity": row["activity"],
             "score": row["score"],
             "created_at": row["created_at"]
         })
+
+    # --------------------------------------------------------
+    # GRAMMAR
+    # --------------------------------------------------------
+
+    cursor.execute("""
+        SELECT
+            'Grammar' AS activity,
+            score,
+            created_at
+        FROM grammar_sessions
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+    """, (user_id, limit))
+
+    grammar_rows = cursor.fetchall()
+
+    for row in grammar_rows:
+
+        activities.append({
+            "activity": row["activity"],
+            "score": row["score"],
+            "created_at": row["created_at"]
+        })
+
+    # --------------------------------------------------------
+    # INTERVIEW
+    # --------------------------------------------------------
 
     cursor.execute("""
         SELECT
@@ -394,11 +466,16 @@ def get_recent_activities(user_id, limit=10):
     interview_rows = cursor.fetchall()
 
     for row in interview_rows:
+
         activities.append({
             "activity": row["activity"],
             "score": row["score"],
             "created_at": row["created_at"]
         })
+
+    # --------------------------------------------------------
+    # SORT BY DATE
+    # --------------------------------------------------------
 
     activities.sort(
         key=lambda x: x["created_at"],
@@ -411,10 +488,140 @@ def get_recent_activities(user_id, limit=10):
 
 
 # ============================================================
+# GET DAILY PROGRESS
+# ============================================================
+
+def get_daily_progress(user_id, days=30):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    # --------------------------------------------------------
+    # SPEAKING
+    # --------------------------------------------------------
+
+    cursor.execute("""
+        SELECT
+            DATE(created_at) AS practice_date,
+            AVG(overall_score) AS average_score,
+            COUNT(*) AS activity_count
+        FROM speaking_sessions
+        WHERE user_id = ?
+        GROUP BY DATE(created_at)
+    """, (user_id,))
+
+    speaking_rows = cursor.fetchall()
+
+    # --------------------------------------------------------
+    # GRAMMAR
+    # --------------------------------------------------------
+
+    cursor.execute("""
+        SELECT
+            DATE(created_at) AS practice_date,
+            AVG(score) AS average_score,
+            COUNT(*) AS activity_count
+        FROM grammar_sessions
+        WHERE user_id = ?
+        GROUP BY DATE(created_at)
+    """, (user_id,))
+
+    grammar_rows = cursor.fetchall()
+
+    # --------------------------------------------------------
+    # INTERVIEW
+    # --------------------------------------------------------
+
+    cursor.execute("""
+        SELECT
+            DATE(created_at) AS practice_date,
+            AVG(score) AS average_score,
+            COUNT(*) AS activity_count
+        FROM interview_sessions
+        WHERE user_id = ?
+        GROUP BY DATE(created_at)
+    """, (user_id,))
+
+    interview_rows = cursor.fetchall()
+
+    connection.close()
+
+    # --------------------------------------------------------
+    # COMBINE ALL ACTIVITIES
+    # --------------------------------------------------------
+
+    daily_data = {}
+
+    all_rows = (
+        list(speaking_rows)
+        + list(grammar_rows)
+        + list(interview_rows)
+    )
+
+    for row in all_rows:
+
+        day = row["practice_date"]
+
+        if day not in daily_data:
+
+            daily_data[day] = {
+                "date": day,
+                "total_score": 0,
+                "activities": 0
+            }
+
+        activity_count = int(
+            row["activity_count"] or 0
+        )
+
+        average_score = float(
+            row["average_score"] or 0
+        )
+
+        daily_data[day]["total_score"] += (
+            average_score * activity_count
+        )
+
+        daily_data[day]["activities"] += (
+            activity_count
+        )
+
+    # --------------------------------------------------------
+    # CREATE FINAL RESULT
+    # --------------------------------------------------------
+
+    result = []
+
+    for day in sorted(daily_data.keys()):
+
+        data = daily_data[day]
+
+        if data["activities"] > 0:
+
+            average = (
+                data["total_score"]
+                / data["activities"]
+            )
+
+        else:
+
+            average = 0
+
+        result.append({
+            "Date": day,
+            "Score": round(average, 2),
+            "Activities": data["activities"]
+        })
+
+    return result[-days:]
+
+
+# ============================================================
 # STREAK
 # ============================================================
 
 def update_streak(user_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -455,6 +662,7 @@ def update_streak(user_id):
         last_date = row["last_practice_date"]
 
         if last_date == today:
+
             connection.close()
             return
 
@@ -486,6 +694,7 @@ def update_streak(user_id):
 # ============================================================
 
 def get_streak(user_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -510,6 +719,7 @@ def get_streak(user_id):
 # ============================================================
 
 def get_user_by_id(user_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -524,6 +734,7 @@ def get_user_by_id(user_id):
     connection.close()
 
     if row:
+
         return {
             "id": row["id"],
             "name": row["name"],
